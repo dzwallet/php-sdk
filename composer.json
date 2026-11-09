@@ -1,0 +1,17 @@
+{
+    "name": "dzwallet/php-sdk",
+    "description": "Plain PHP SDK for the DzWallet payment API (CIB / Edahabia via SATIM, payment links and QR codes). No framework needed.",
+    "type": "library",
+    "license": "MIT",
+    "keywords": ["payment", "sdk", "dzwallet", "satim", "cib", "edahabia", "algeria", "dzd"],
+    "homepage": "https://dzwallet.app",
+    "require": {
+        "php": ">=7.4",
+        "ext-curl": "*",
+        "ext-json": "*"
+    },
+    "autoload": {
+        "psr-4": { "DzWallet\\Sdk\\": "src/" }
+    },
+    "minimum-stability": "stable"
+}
