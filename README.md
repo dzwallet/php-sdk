@@ -52,45 +52,16 @@ exit;
 
 ## Receive the notification (IPN)
 
-```php
-$order = find_order_by_identifier($_POST['identifier'] ?? '');   // your own code
-try {
-    // throws InvalidSignatureException when the message is not from DzWallet,
-    // is for another order, or carries another amount
-    $ipn = $dz->verifyIpn($_POST, $order['identifier'], $order['total']);
-} catch (\DzWallet\Sdk\Exceptions\InvalidSignatureException $e) {
-    http_response_code(403);
-    exit;
-}
+Use the [signed webhook example](examples/ipn.php). It verifies the v2 signature
+against the raw request body, checks that the payment succeeded, and matches the
+order, amount, and currency before recording payment. Implement
+`record_payment_once` in your database so the event ID and order update commit
+together. Return HTTP 200 after the transaction commits or when the event was
+already processed.
 
-if ($ipn->isSuccess() && !$order['paid']) {      // the same notification can arrive twice
-    mark_order_paid($order['id'], $ipn->trx());
-}
-echo 'OK';                                       // answer quickly with HTTP 200
-```
-
-The older `signature` field is `UPPERCASE(HMAC-SHA256(data.amount + identifier, SECRET_KEY))`. The SDK checks it with `hash_equals`.
-
-### Signed notifications v2 (recommended)
-
-Every notification also carries `X-DzWallet-Signature: t=<unix time>,v1=<hex>` where `v1 = HMAC-SHA256(secret, t + "." + raw body)`. It covers the whole body (status, amount, transaction), a signed timestamp and a unique event id:
-
-```php
-$raw = file_get_contents('php://input');                       // exact body, before parsing
-try {
-    $meta = $dz->verifyWebhook($raw, $_SERVER['HTTP_X_DZWALLET_SIGNATURE'] ?? '');   // 5 minute window
-} catch (\DzWallet\Sdk\Exceptions\InvalidSignatureException $e) {
-    http_response_code(403); exit;
-}
-if (already_processed($meta['event_id'])) { http_response_code(200); exit; }   // unique constraint on event_id
-parse_str($raw, $payload);
-$ipn = $dz->verifyIpn($payload, $order['identifier'], $order['total']);       // identifier + amount match YOUR order
-mark_order_paid($order['id'], $ipn->trx());
-record_event($meta['event_id']);
-http_response_code(200);
-```
-
-The event id is read from the signed body, so a replayed request cannot dodge the duplicate check by changing a header.
+The SDK also supports the legacy body signature through `verifyIpn()`. New
+integrations should verify the v2 header with `verifyWebhook()` before using the
+payment data. DzWallet makes up to 15 delivery attempts.
 
 ## Check a payment from your server
 

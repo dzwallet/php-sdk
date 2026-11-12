@@ -7,18 +7,36 @@ use DzWallet\Sdk\Exceptions\InvalidSignatureException;
 
 $dz = new Client(['mode' => 'test', 'public_key' => getenv('DZWALLET_PUBLIC_KEY'), 'secret_key' => getenv('DZWALLET_SECRET_KEY')]);
 
-// Load YOUR order by the identifier first (replace with your own database code).
-$order = find_order_by_identifier($_POST['identifier'] ?? '');
-if (!$order) { http_response_code(404); exit; }
-
+$raw = file_get_contents('php://input');
 try {
-    $ipn = $dz->verifyIpn($_POST, $order['identifier'], $order['total']);   // signature + identifier + amount
+    $meta = $dz->verifyWebhook($raw, $_SERVER['HTTP_X_DZWALLET_SIGNATURE'] ?? '');
+    parse_str($raw, $payload);
+    $ipn = $dz->verifyIpn($payload);
 } catch (InvalidSignatureException $e) {
     http_response_code(403);
     exit;
 }
 
-if ($ipn->isSuccess() && !$order['paid']) {          // idempotent: the same IPN can arrive twice
-    mark_order_paid($order['id'], $ipn->trx());
+$eventId = $meta['event_id'];
+if (!$eventId || !$ipn->isSuccess()) {
+    http_response_code(400);
+    exit;
 }
+
+$order = find_order_by_identifier($ipn->identifier); // your database
+if (!$order) {
+    http_response_code(404);
+    exit;
+}
+
+if (($ipn->data['currency'] ?? null) !== $order['currency'] ||
+    abs((float) $ipn->amount() - (float) $order['total']) > 0.005) {
+    http_response_code(400);
+    exit;
+}
+
+// Implement in your database. Record the unique event ID and mark the
+// order paid in one transaction. Treat a duplicate as already processed.
+record_payment_once($eventId, $order['id'], $ipn->trx());
+http_response_code(200);
 echo 'OK';
