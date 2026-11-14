@@ -1,7 +1,6 @@
 # DzWallet PHP SDK
 
 Plain PHP client for the [DzWallet](https://dzwallet.app) payment API: accept **CIB** and **Edahabia** card payments (through SATIM), create **payment links and QR codes**, check payment status and verify the signed payment notification (IPN). **No framework needed** (for Laravel use `dzwallet/laravel-sdk`).
-
 - PHP 7.4+ with `curl` and `json`
 - Test mode never contacts a real gateway
 - Payments are never retried automatically, so a slow answer cannot create two payments
@@ -98,6 +97,8 @@ All extend `DzWallet\Sdk\Exceptions\DzWalletException`. Limit: 60 requests per m
 ```bash
 php tests/run.php
 ```
+
+Dzwallet
 
 The tests use a fake transport: they never call DzWallet and never create a payment.
 
